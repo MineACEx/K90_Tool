@@ -1,0 +1,39 @@
+#!/system/bin/sh
+# 禁用Joyse云控
+echo "        禁用小米Joyse云控"
+echo "====================================="
+echo -n "确认执行？输入 y 继续，其他键退出："
+read confirm
+if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ];then
+    echo "已取消"
+    exit 0
+fi
+
+echo "正在禁用Joyse相关服务..."
+
+# 1. 冻结云控核心应用/服务（已生效）
+su -c "pm disable --user 0 com.miui.yuncontrol" 2>/dev/null
+su -c "pm disable --user 0 com.xiaomi.joyse" 2>/dev/null
+su -c "pm disable --user 0 com.miui.analytics" 2>/dev/null
+
+# 2. 用Magisk Hide/属性屏蔽方式
+echo "正在设置属性屏蔽..."
+su -c "resetprop persist.sys.miui.cloudcontrol.enable false"
+su -c "resetprop persist.miui.yuncontrol.enabled 0"
+su -c "resetprop persist.sys.joyse.enabled 0"
+su -c "resetprop persist.miui.cloudcontrol.url ''"
+
+# 3. 用Magisk的hosts模块方式
+echo "正在创建/data/local/hosts屏蔽规则..."
+HOSTS_DIR="/data/local"
+HOSTS_FILE="${HOSTS_DIR}/hosts"
+su -c "mkdir -p $HOSTS_DIR"
+
+# 写入屏蔽规则
+su -c "echo -e '127.0.0.1 cloudcontrol.miui.com\n127.0.0.1 joyse.miui.com\n127.0.0.1 data.miui.com\n127.0.0.1 tracking.miui.com' > $HOSTS_FILE"
+
+echo -e "\n✅ 云控禁用操作已完成！"
+echo "建议重启设备，确保所有服务不再启动"
+echo "-------------------------------------"
+echo "按回车返回主菜单..."
+read

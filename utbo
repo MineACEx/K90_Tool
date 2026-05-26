@@ -1,0 +1,29 @@
+#!/system/bin/sh
+echo "0 - 正常重启"
+echo "1 - 热重启 (仅重启系统界面)"
+echo "2 - 重启到 Fastboot"
+echo "3 - 重启到 Recovery"
+echo "-------------------------------------"
+echo -n "请输入序号选择功能: "
+read utrb
+echo "-------------------------------------"
+
+case $utrb in
+0)
+    echo "正在正常重启..."
+    su -c reboot
+    ;;
+1)
+    echo "正在执行热重启..."
+    su -c "setprop ctl.restart zygote"
+    echo "热重启已触发，桌面将在几秒内重新加载"
+    sleep 2
+    ;;
+2)
+    echo "正在重启到 Fastboot..."
+    su -c reboot bootloader
+    ;;
+3)
+    echo "正在重启到 Recovery..."
+    su -c reboot recovery
+;;

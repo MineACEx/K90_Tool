@@ -1,0 +1,153 @@
+#!/system/bin/sh
+# 全分区备份恢复
+BACKUP_DIR="./allimg"
+BB_BIN="./bin/busybox"
+
+# 工具调用
+TAR="$BB_BIN tar"
+GZIP="$BB_BIN gzip"
+MKDIR="$BB_BIN mkdir"
+
+# 初始化目录
+$MKDIR -p "$BACKUP_DIR"
+
+echo "         分区备份恢复工具"
+echo "====================================="
+echo "备份目录：$BACKUP_DIR"
+echo "工具依赖：$BB_BIN"
+echo "运行中可随时终止任务"
+echo "====================================="
+echo "0 - 备份分区（完成自动压缩）"
+echo "1 - 从 allimg 目录直接恢复"
+echo "2 - 先解压压缩包，再执行恢复"
+echo -n "请输入序号选择功能："
+read action
+echo "-------------------------------------"
+
+# 过滤后的分区列表（去掉不存在的 cache/logfsdump）
+PART_LIST=(
+"abl_a"
+"abl_b"
+"xbl_a"
+"xbl_b"
+"xbl_config_a"
+"xbl_config_b"
+"boot_a"
+"boot_b"
+"init_boot_a"
+"init_boot_b"
+"dtbo_a"
+"dtbo_b"
+"recovery_a"
+"recovery_b"
+"vbmeta_a"
+"vbmeta_b"
+"vbmeta_system_a"
+"vbmeta_system_b"
+"devcfg_a"
+"devcfg_b"
+"dsp_a"
+"dsp_b"
+)
+
+# ===================== 0 分区备份 + 单次压缩 =====================
+if [ "$action" = "0" ];then
+    echo "【开始全量备份分区】"
+    for part in "${PART_LIST[@]}";do
+        SRC="/dev/block/by-name/${part}"
+        DST="${BACKUP_DIR}/${part}.img"
+        echo "备份：$part"
+        su -c "dd if=$SRC of=$DST"
+    done
+
+    echo -e "\n【开始打包压缩，请勿中断】"
+    if [ -f "$BB_BIN" ];then
+        # 进入脚本所在目录执行tar，避免路径混乱
+        SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+        cd "$SCRIPT_DIR"
+        # 去掉不兼容的--checkpoint，改用-v参数显示处理文件
+        $TAR -zcvf allimg.tar.gz allimg
+        echo -e "\n✅ 压缩完成：$SCRIPT_DIR/allimg.tar.gz"
+    else
+        echo "❌ 未找到 busybox，跳过压缩！"
+    fi
+
+    echo -e "\n✅ 所有操作完成！"
+
+# ===================== 1 直接从目录恢复 =====================
+elif [ "$action" = "1" ];then
+    echo "【校验备份文件完整性】"
+    for part in "${PART_LIST[@]}";do
+        if [ ! -f "${BACKUP_DIR}/${part}.img" ];then
+            echo "❌ 缺失分区文件：${part}.img ，终止恢复"
+            exit 1
+        fi
+    done
+
+    echo -e "\n⚠️  警告：恢复将覆盖系统分区，风险极高！"
+    echo -n "确认继续？输入 y 确认，其他键退出："
+    read confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ];then
+        echo "已取消恢复"
+        exit 0
+    fi
+
+    echo -e "\n【开始恢复分区】"
+    for part in "${PART_LIST[@]}";do
+        SRC="${BACKUP_DIR}/${part}.img"
+        DST="/dev/block/by-name/${part}"
+        echo "恢复：$part"
+        su -c "dd if=$SRC of=$DST"
+    done
+
+    echo -e "\n✅ 恢复完成，建议重启设备生效！"
+
+# ===================== 2 先解压压缩包，再恢复 =====================
+elif [ "$action" = "2" ];then
+    SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+    cd "$SCRIPT_DIR"
+    if [ ! -f "./allimg.tar.gz" ];then
+        echo "❌ 未找到压缩包 allimg.tar.gz"
+        exit 1
+    fi
+    if [ ! -f "$BB_BIN" ];then
+        echo "❌ 缺失 busybox，无法解压"
+        exit 1
+    fi
+
+    echo "【开始解压 allimg.tar.gz】"
+    $TAR -xzvf allimg.tar.gz
+    echo -e "\n✅ 解压完成，开始校验文件..."
+
+    for part in "${PART_LIST[@]}";do
+        if [ ! -f "${BACKUP_DIR}/${part}.img" ];then
+            echo "❌ 解压后文件缺失：${part}.img"
+            exit 1
+        fi
+    done
+
+    echo -e "\n⚠️  警告：即将执行恢复操作！"
+    echo -n "确认继续？输入 y 确认："
+    read confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ];then
+        echo "已取消"
+        exit 0
+    fi
+
+    echo -e "\n【恢复分区】"
+    for part in "${PART_LIST[@]}";do
+        SRC="${BACKUP_DIR}/${part}.img"
+        DST="/dev/block/by-name/${part}"
+        echo "恢复：$part"
+        su -c "dd if=$SRC of=$DST"
+    done
+
+    echo -e "\n✅ 解压+恢复全部完成！建议重启"
+
+else
+    echo "❌ 输入序号错误，退出"
+    exit 1
+fi
+
+echo -e "\n按回车键返回主菜单..."
+read

@@ -1,0 +1,84 @@
+#!/system/bin/sh
+# K90 分区备份/刷入工具（A/B分区通用）
+BACKUP_DIR="./allimg"
+mkdir -p "$BACKUP_DIR"
+echo "        分区备份/刷入工具"
+echo "====================================="
+echo "备份目录：$BACKUP_DIR"
+echo "运行中可随时终止"
+echo "====================================="
+echo "0 - 备份指定分区（含A/B）"
+echo "1 - 刷入镜像到指定分区（含A/B）"
+echo -n "请输入序号选择功能："
+read op
+echo "-------------------------------------"
+
+if [ "$op" = "0" ];then
+    # 备份模式
+    echo "【分区备份模式】"
+    echo "请输入分区名（如 boot、init_boot、abl 等，只需主分区名，不用加_a/_b）"
+    echo -n "分区名："
+    read part_name
+
+    # 校验分区是否存在
+    if [ ! -e "/dev/block/by-name/${part_name}_a" ] || [ ! -e "/dev/block/by-name/${part_name}_b" ];then
+        echo "❌ 错误：分区 ${part_name}_a / ${part_name}_b 不存在！"
+        exit 1
+    fi
+
+    echo "✅ 分区校验通过，开始备份..."
+    echo "备份：${part_name}_a → ${BACKUP_DIR}/${part_name}_a_bk.img"
+    su -c "dd if=/dev/block/by-name/${part_name}_a of=${BACKUP_DIR}/${part_name}_a_bk.img"
+
+    echo "备份：${part_name}_b → ${BACKUP_DIR}/${part_name}_b_bk.img"
+    su -c "dd if=/dev/block/by-name/${part_name}_b of=${BACKUP_DIR}/${part_name}_b_bk.img"
+
+    echo -e "\n✅ 分区备份完成！文件已保存到：$BACKUP_DIR"
+
+elif [ "$op" = "1" ];then
+    # 刷入模式
+    echo "【分区刷入模式】"
+    echo "请输入要刷入的目标分区名（如 boot、init_boot、abl 等，只需主分区名）"
+    echo -n "目标分区名："
+    read part_name
+
+    echo "请输入镜像文件的完整路径（如 /sdcard/boot.img，不用管文件名）"
+    echo -n "镜像路径："
+    read img_path
+
+    # 前置校验
+    if [ ! -f "$img_path" ];then
+        echo "❌ 错误：镜像文件不存在！"
+        exit 1
+    fi
+    if [ ! -e "/dev/block/by-name/${part_name}_a" ] || [ ! -e "/dev/block/by-name/${part_name}_b" ];then
+        echo "❌ 错误：目标分区 ${part_name}_a / ${part_name}_b 不存在！"
+        exit 1
+    fi
+
+    echo -e "\n⚠️  警告：刷入会覆盖分区数据！"
+    echo "目标分区：${part_name}_a / ${part_name}_b"
+    echo "镜像文件：$img_path"
+    echo -n "确认继续？输入 y 确认："
+    read confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ];then
+        echo "已取消刷入"
+        exit 0
+    fi
+
+    echo "✅ 校验通过，开始刷入..."
+    echo "刷入：$img_path → ${part_name}_a"
+    su -c "dd if=$img_path of=/dev/block/by-name/${part_name}_a"
+
+    echo "刷入：$img_path → ${part_name}_b"
+    su -c "dd if=$img_path of=/dev/block/by-name/${part_name}_b"
+
+    echo -e "\n✅ 刷入完成！建议重启设备生效"
+
+else
+    echo "❌ 输入序号错误，退出"
+    exit 1
+fi
+
+echo -e "\n按回车返回主菜单..."
+read

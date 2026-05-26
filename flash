@@ -1,0 +1,381 @@
+#!/system/bin/sh
+# 刷入脚本
+URL="https://mineacex.github.io/Shell/"
+BUSYBOX="./bin/busybox"
+kernelsu="https://links.8uid.com/d/d9b466c5b55f1c108467e132cce7e199"
+sukisu="https://links.8uid.com/d/a1f132f9b315bfcc124a41b7b69dda55"
+alpha="https://links.8uid.com/d/a9e30d9633b1b04ed341283ea64158bb"
+mask="https://links.8uid.com/d/e29ca2b680748f9a72e87485fe866625"
+YuanChang="https://links.8uid.com/d/91484672e3ac841ad1a2287998153ac2"
+TIMEOUT=20
+
+# 检查 busybox 是否存在并可执行
+if [ ! -x "$BUSYBOX" ]; then
+    echo "错误：找不到可执行的 busybox，请检查路径 $BUSYBOX"
+    exit 1
+fi
+
+# 定义函数：获取网页源码
+get_html_source() {
+    local url="$1"
+    local timeout="$2"
+    local busybox_path="$3"
+    local source=""
+
+    # 优先尝试 wget
+    source=$("$busybox_path" wget -q -T "$timeout" -O - -U "Mozilla/5.0" "$url" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$source" ]; then
+        echo "$source"
+        return 0
+    fi
+
+    # wget 失败，尝试 curl
+    echo "wget 失败，切换为 curl..."
+    source=$("$busybox_path" curl -s -m "$timeout" -A "Mozilla/5.0" "$url" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$source" ]; then
+        echo "$source"
+        return 0
+    fi
+
+    # 两种方式都失败
+    return 1
+}
+
+# 主逻辑
+echo "开始获取版本号...(推荐魔法)"
+
+# 调用函数获取源码，并存储到变量
+HTML_CONTENT=$(get_html_source "$URL" "$TIMEOUT" "$BUSYBOX")
+
+# 检查是否获取成功
+if [ $? -ne 0 ] || [ -z "$HTML_CONTENT" ]; then
+    echo -e "\n❌ 拉取失败，请检查："
+    echo "1. 网络连接是否正常"
+    echo "2. 链接 $URL 是否可访问"
+    echo "3. busybox 是否支持 wget/curl 命令"
+    exit 1
+fi
+
+# 用 echo 输出变量中的源码内容
+echo -e "✅ 获取成功，版本列表如下："
+echo "-------------------------------------"
+echo "$HTML_CONTENT"
+echo "-------------------------------------"
+echo -n "请输入序号选择刷入: "
+mkdir -p ./img
+read sx
+case $sx in
+
+   0)
+URL="$YuanChang"
+DL_TIMEOUT=300
+SAVE_PATH="./img/initboot1.img"
+echo
+echo "正在下载镜像..."
+
+# 先 wget
+"$BUSYBOX" wget -q -T $DL_TIMEOUT -U "Mozilla/5.0" -O "$SAVE_PATH" "$URL" 2>/dev/null
+if [ $? -eq 0 ];then
+    echo "wget 下载成功"
+else
+    echo "wget 下载失败，尝试 curl..."
+    # 超时/失败 换 curl
+    "$BUSYBOX" curl -s -m $DL_TIMEOUT -A "Mozilla/5.0" -o "$SAVE_PATH" "$URL" 2>/dev/null
+    if [ $? -eq 0 ];then
+        echo "curl 下载成功"
+    else
+        echo "❌ 两种方式下载均失败，终止脚本"
+        exit 1
+    fi
+fi
+
+# 检查文件是否存在且非空
+if [ ! -f "$SAVE_PATH" ] || [ ! -s "$SAVE_PATH" ]; then
+    echo "❌ 镜像文件不存在或为空，终止刷写"
+    exit 1
+fi
+
+sleep 0.1
+echo
+echo "正在刷入至AB分区..."
+PART_A="/dev/block/by-name/init_boot_a"
+PART_B="/dev/block/by-name/init_boot_b"
+IMG="$SAVE_PATH"
+
+dd if="$IMG" of="$PART_A"
+if [ $? -eq 0 ];then
+    echo "A分区刷写成功"
+else
+    echo "❌ A分区刷写失败，终止脚本"
+    exit 1
+fi
+
+dd if="$IMG" of="$PART_B"
+if [ $? -eq 0 ];then
+    echo "B分区刷写成功"
+else
+    echo "❌ B分区刷写失败"
+fi
+
+echo "是否重启?[Y/n]"
+read rbot
+if [ "$rbot" = "Y" ] || [ "$rbot" = "y" ]; then
+  echo "正在重启..."
+  reboot
+else
+  echo "脚本结束..."
+  exit 0
+fi
+   ;;
+
+1)
+URL="$sukisu"
+DL_TIMEOUT=300
+SAVE_PATH="./img/initboot2.img"
+echo
+echo "正在下载镜像..."
+
+# 先 wget
+"$BUSYBOX" wget -q -T $DL_TIMEOUT -U "Mozilla/5.0" -O "$SAVE_PATH" "$URL" 2>/dev/null
+if [ $? -eq 0 ];then
+    echo "wget 下载成功"
+else
+    echo "wget 下载失败，尝试 curl..."
+    # 超时/失败 换 curl
+    "$BUSYBOX" curl -s -m $DL_TIMEOUT -A "Mozilla/5.0" -o "$SAVE_PATH" "$URL" 2>/dev/null
+    if [ $? -eq 0 ];then
+        echo "curl 下载成功"
+    else
+        echo "❌ 两种方式下载均失败，终止脚本"
+        exit 1
+    fi
+fi
+
+# 检查文件是否存在且非空
+if [ ! -f "$SAVE_PATH" ] || [ ! -s "$SAVE_PATH" ]; then
+    echo "❌ 镜像文件不存在或为空，终止刷写"
+    exit 1
+fi
+
+sleep 0.1
+echo
+echo "正在刷入至AB分区..."
+PART_A="/dev/block/by-name/init_boot_a"
+PART_B="/dev/block/by-name/init_boot_b"
+IMG="$SAVE_PATH"
+
+dd if="$IMG" of="$PART_A"
+if [ $? -eq 0 ];then
+    echo "A分区刷写成功"
+else
+    echo "❌ A分区刷写失败，终止脚本"
+    exit 1
+fi
+
+dd if="$IMG" of="$PART_B"
+if [ $? -eq 0 ];then
+    echo "B分区刷写成功"
+else
+    echo "❌ B分区刷写失败"
+fi
+
+echo "是否重启?[Y/n]"
+read rbot
+if [ "$rbot" = "Y" ] || [ "$rbot" = "y" ]; then
+  echo "正在重启..."
+  reboot
+else
+  echo "脚本结束..."
+  exit 0
+fi
+;;
+
+2)
+URL="$alpha"
+DL_TIMEOUT=300
+SAVE_PATH="./img/initboot3.img"
+echo
+echo "正在下载镜像..."
+
+# 先 wget
+"$BUSYBOX" wget -q -T $DL_TIMEOUT -U "Mozilla/5.0" -O "$SAVE_PATH" "$URL" 2>/dev/null
+if [ $? -eq 0 ];then
+    echo "wget 下载成功"
+else
+    echo "wget 下载失败，尝试 curl..."
+    # 超时/失败 换 curl
+    "$BUSYBOX" curl -s -m $DL_TIMEOUT -A "Mozilla/5.0" -o "$SAVE_PATH" "$URL" 2>/dev/null
+    if [ $? -eq 0 ];then
+        echo "curl 下载成功"
+    else
+        echo "❌ 两种方式下载均失败，终止脚本"
+        exit 1
+    fi
+fi
+
+# 检查文件是否存在且非空
+if [ ! -f "$SAVE_PATH" ] || [ ! -s "$SAVE_PATH" ]; then
+    echo "❌ 镜像文件不存在或为空，终止刷写"
+    exit 1
+fi
+
+sleep 0.1
+echo
+echo "正在刷入至AB分区..."
+PART_A="/dev/block/by-name/init_boot_a"
+PART_B="/dev/block/by-name/init_boot_b"
+IMG="$SAVE_PATH"
+
+dd if="$IMG" of="$PART_A"
+if [ $? -eq 0 ];then
+    echo "A分区刷写成功"
+else
+    echo "❌ A分区刷写失败，终止脚本"
+    exit 1
+fi
+
+dd if="$IMG" of="$PART_B"
+if [ $? -eq 0 ];then
+    echo "B分区刷写成功"
+else
+    echo "❌ B分区刷写失败"
+fi
+
+echo "是否重启?[Y/n]"
+read rbot
+if [ "$rbot" = "Y" ] || [ "$rbot" = "y" ]; then
+  echo "正在重启..."
+  reboot
+else
+  echo "脚本结束..."
+  exit 0
+fi
+;;
+3)
+URL="$mask"
+DL_TIMEOUT=300
+SAVE_PATH="./img/initboot4.img"
+echo
+echo "正在下载镜像..."
+
+# 先 wget
+"$BUSYBOX" wget -q -T $DL_TIMEOUT -U "Mozilla/5.0" -O "$SAVE_PATH" "$URL" 2>/dev/null
+if [ $? -eq 0 ];then
+    echo "wget 下载成功"
+else
+    echo "wget 下载失败，尝试 curl..."
+    # 超时/失败 换 curl
+    "$BUSYBOX" curl -s -m $DL_TIMEOUT -A "Mozilla/5.0" -o "$SAVE_PATH" "$URL" 2>/dev/null
+    if [ $? -eq 0 ];then
+        echo "curl 下载成功"
+    else
+        echo "❌ 两种方式下载均失败，终止脚本"
+        exit 1
+    fi
+fi
+
+# 检查文件是否存在且非空
+if [ ! -f "$SAVE_PATH" ] || [ ! -s "$SAVE_PATH" ]; then
+    echo "❌ 镜像文件不存在或为空，终止刷写"
+    exit 1
+fi
+
+sleep 0.1
+echo
+echo "正在刷入至AB分区..."
+PART_A="/dev/block/by-name/init_boot_a"
+PART_B="/dev/block/by-name/init_boot_b"
+IMG="$SAVE_PATH"
+
+dd if="$IMG" of="$PART_A"
+if [ $? -eq 0 ];then
+    echo "A分区刷写成功"
+else
+    echo "❌ A分区刷写失败，终止脚本"
+    exit 1
+fi
+
+dd if="$IMG" of="$PART_B"
+if [ $? -eq 0 ];then
+    echo "B分区刷写成功"
+else
+    echo "❌ B分区刷写失败"
+fi
+
+echo "是否重启?[Y/n]"
+read rbot
+if [ "$rbot" = "Y" ] || [ "$rbot" = "y" ]; then
+  echo "正在重启..."
+  reboot
+else
+  echo "脚本结束..."
+  exit 0
+fi
+;;
+4)
+URL="$kernelsu"
+DL_TIMEOUT=300
+SAVE_PATH="./img/initboot5.img"
+echo
+echo "正在下载镜像..."
+
+# 先 wget
+"$BUSYBOX" wget -q -T $DL_TIMEOUT -U "Mozilla/5.0" -O "$SAVE_PATH" "$URL" 2>/dev/null
+if [ $? -eq 0 ];then
+    echo "wget 下载成功"
+else
+    echo "wget 下载失败，尝试 curl..."
+    # 超时/失败 换 curl
+    "$BUSYBOX" curl -s -m $DL_TIMEOUT -A "Mozilla/5.0" -o "$SAVE_PATH" "$URL" 2>/dev/null
+    if [ $? -eq 0 ];then
+        echo "curl 下载成功"
+    else
+        echo "❌ 两种方式下载均失败，终止脚本"
+        exit 1
+    fi
+fi
+
+# 检查文件是否存在且非空
+if [ ! -f "$SAVE_PATH" ] || [ ! -s "$SAVE_PATH" ]; then
+    echo "❌ 镜像文件不存在或为空，终止刷写"
+    exit 1
+fi
+
+sleep 0.1
+echo
+echo "正在刷入至AB分区..."
+PART_A="/dev/block/by-name/init_boot_a"
+PART_B="/dev/block/by-name/init_boot_b"
+IMG="$SAVE_PATH"
+
+dd if="$IMG" of="$PART_A"
+if [ $? -eq 0 ];then
+    echo "A分区刷写成功"
+else
+    echo "❌ A分区刷写失败，终止脚本"
+    exit 1
+fi
+
+dd if="$IMG" of="$PART_B"
+if [ $? -eq 0 ];then
+    echo "B分区刷写成功"
+else
+    echo "❌ B分区刷写失败"
+fi
+
+echo "是否重启?[Y/n]"
+read rbot
+if [ "$rbot" = "Y" ] || [ "$rbot" = "y" ]; then
+  echo "正在重启..."
+  reboot
+else
+  echo "脚本结束..."
+  exit 0
+fi
+;;
+   *)
+      echo "输入错误 请重新输入..."
+      exit 1
+   ;;
+   
+esac

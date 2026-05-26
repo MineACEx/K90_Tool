@@ -1,0 +1,94 @@
+#!/system/bin/sh
+# 分区镜像 解包/打包 工具（强制移动所有文件版）
+BIN="./bin"
+OUT="./fkimgs"
+SCRIPT_DIR=$(pwd)
+
+# 给bin工具加权限
+chmod 777 "$BIN"/* 2>/dev/null
+
+# 清空输出目录和根目录残留文件
+rm -rf "$OUT"
+mkdir -p "$OUT"
+rm -f ./ramdisk.cpio ./header ./kernel ./ramdisk.cpio.gz ./boot.img ./dtb ./dtbo
+
+echo "      分区镜像 解包/打包 工具"
+echo "====================================="
+echo "工具目录：$BIN"
+echo "输出目录：$OUT"
+echo "-------------------------------------"
+echo "0 - 解包镜像"
+echo "1 - 打包镜像"
+echo -n "请输入序号选择功能："
+read op
+echo "-------------------------------------"
+
+if [ "$op" = "0" ]; then
+    echo "【解包模式】"
+    echo -n "输入镜像完整路径："
+    read IMG
+
+    if [ ! -f "$IMG" ]; then
+        echo "❌ 镜像文件不存在"
+        exit 1
+    fi
+
+    # 先清空根目录，避免旧文件干扰
+    rm -f ./ramdisk.cpio ./header ./kernel ./ramdisk.cpio.gz ./boot.img ./dtb ./dtbo
+
+    echo "正在解包 boot/init_boot 镜像..."
+    "$BIN/magiskboot" unpack -h "$IMG"
+
+    # 强制把所有可能生成的文件移动到fkimgs
+    mv ./ramdisk.cpio ./header ./kernel ./ramdisk.cpio.gz ./boot.img ./dtb ./dtbo "$OUT/" 2>/dev/null
+
+    # 检查是否有文件被移动
+    if ls "$OUT"/* 1>/dev/null 2>&1; then
+        echo "✅ 解包文件已移动到：$OUT"
+
+        # 解压 ramdisk.cpio
+        if [ -f "$OUT/ramdisk.cpio" ]; then
+            mkdir -p "$OUT/ramdisk"
+            cd "$OUT/ramdisk"
+            cpio -i < ../ramdisk.cpio
+            cd "$SCRIPT_DIR"
+            echo "✅ ramdisk 已解压至 $OUT/ramdisk"
+        fi
+    else
+        echo "⚠️  解包无输出，尝试 ext4/erofs"
+        if [ -x "$BIN/extract.erofs" ] && "$BIN/extract.erofs" "$IMG" "$OUT/erofs" 2>/dev/null; then
+            echo "✅ erofs 解包完成：$OUT/erofs"
+        elif [ -x "$BIN/e2fsdroid" ] && "$BIN/e2fsdroid" -f "$IMG" "$OUT/ext4" 2>/dev/null; then
+            echo "✅ ext4 解包完成：$OUT/ext4"
+        else
+            echo "❌ 不支持该镜像格式"
+        fi
+    fi
+
+elif [ "$op" = "1" ]; then
+    echo "【打包模式】"
+    echo -n "输入待打包目录路径："
+    read DIR
+    echo -n "输入输出镜像名称："
+    read OIMG
+
+    if [ ! -d "$DIR" ]; then
+        echo "❌ 目录不存在"
+        exit 1
+    fi
+
+    echo "开始打包..."
+    if [ -x "$BIN/mkfs.erofs" ] && "$BIN/mkfs.erofs" -zlz4 "$OIMG" "$DIR" 2>/dev/null; then
+        echo "✅ 打包为 erofs 镜像成功：$OIMG"
+    elif [ -x "$BIN/mke2fs" ] && [ -x "$BIN/e2fsdroid" ] && "$BIN/mke2fs" -t ext4 "$OIMG" 1G 2>/dev/null && "$BIN/e2fsdroid" -f "$DIR" "$OIMG" 2>/dev/null; then
+        echo "✅ 打包为 ext4 镜像成功：$OIMG"
+    else
+        echo "❌ 打包失败"
+    fi
+
+else
+    echo "❌ 输入序号错误"
+fi
+
+echo -e "\n按回车返回..."
+read
