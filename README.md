@@ -16,37 +16,6 @@
 | 禁用 Joyse 云控 | 屏蔽小米云控，禁用数据上传与后台控制 |
 | 一键清理脚本数据 | 清理临时文件、日志与缓存 |
 
----
-
-## 📦 目录结构
-K90_Tool/
-├── .main_start.sh       # 主菜单入口（隐藏文件）
-├── bin/                 # 工具链目录
-│   ├── busybox
-│   ├── e2fsdroid
-│   ├── extract.erofs
-│   ├── magiskboot
-│   ├── mke2fs
-│   ├── mkfs.erofs
-│   └── simg2img
-├── allimg/              # 分区备份镜像存放目录
-├── fkimgs/              # 镜像解包输出目录
-├── img/                 # 原始镜像存放目录
-├── log/                 # 脚本运行日志目录
-├── bkalig               # 分区备份脚本
-├── check_perm.sh        # 权限检查与修复脚本
-├── clear                # 一键清理脚本
-├── csimg                # 镜像解包/打包脚本
-├── fkimg                # 旧版解包脚本（已废弃）
-├── fkjoy                # Joyse 云控禁用脚本
-├── flash                # 分区刷入脚本
-├── utbo                 # 旧版 boot 解包脚本（已废弃）
-├── README.md            # 中文说明文档
-├── README_EN.md         # 英文说明文档
-└── LICENSE              # MIT 开源许可
-
----
-
 ## 🚀 使用方法
 ### 1. 前置准备
 - 设备已 Root（推荐 Magisk/KernelSU）
